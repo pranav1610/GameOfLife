@@ -14,10 +14,10 @@ MAX_ROWS = 10
 	; 0 represents DEAD
 	; 1 represents ALIVE
 	; NOTE: actual game is stored only between index (1-MAX_ROWS-2) and (1-MAX_COLS-2) inclusive. 
-	grid BYTE MAX_ROWS*MAX_COLS DUP (0)
+	grid BYTE MAX_ROWS*MAX_COLS DUP ('0')
 
 	; copy of the grid that stores the game of life 
-	tempGrid BYTE MAX_ROWS*MAX_COLS DUP (0)
+	tempGrid BYTE MAX_ROWS*MAX_COLS DUP ('0')
 
 	; character representing the organism
 	organism BYTE 'O'
@@ -35,6 +35,12 @@ MAX_ROWS = 10
 	; j --> column of the character to be read
 	j DWORD ?
 
+	; temporary row of the character to be read
+	tempI DWORD ?
+	
+	; temporary column of the character to be read
+	tempJ DWORD ?
+
 	; val --> value to be set at a location i,j in grid[i][j]
 	val BYTE ?
 
@@ -44,6 +50,9 @@ MAX_ROWS = 10
 	; Stores the character in above index
 	tempChar BYTE ?
 
+	; flag indicates if main grid is to be drawn(=1) or tempGrid(=0)
+	drawMain DWORD 1
+
 	; flag indicates if the temp grid is to be copied to main grid or other way. 1 means main = temp(copy temp to main), and 0 means temp = main
 	copyToMain DWORD 0
 
@@ -52,6 +61,13 @@ MAX_ROWS = 10
 
 	; flag indicates if the grid[i][j] is to be set to val in grid or tempGrid. 1 means grid[i][j]=val and 0 means tempGrid[i][j]=val
 	setInMain DWORD 1
+
+	; stores the number of alive in the mini 3x3 grid
+	numAlive DWORD 0
+
+	testStr BYTE "here", 0
+
+	
 
 .code
 main PROC
@@ -65,11 +81,13 @@ main PROC
 	sub dl, MAX_ROWS*2
 	mov gridY, dl
 
-	call initGrid
+	;call initGrid
 
 	call setTheseAlive
 
 	call drawGrid
+
+	call countNeighbors
 	
 
 	INVOKE ExitProcess, 0
@@ -210,6 +228,9 @@ initGrid PROC
 			; parameters i, j, setInMain, and val are set, call grid[i][j] = val now.
 			call set_ij
 
+			mov setInMain, 0
+			call set_ij
+
 			inc edi
 			loop INNER
 
@@ -248,6 +269,7 @@ setTheseAlive PROC
 		mov j, 4
 		call set_ij
 		
+		mov val, '0'
 		mov setInMain, 0
 	popad
 	ret
@@ -264,8 +286,7 @@ copyGrid PROC
 	pushad
 		mov esi, OFFSET grid
 		mov edi, OFFSET tempGrid
-		mov ecx, LENGTHOF grid
-
+		mov ecx, MAX_ROWS*MAX_COLS
 		
 		cmp copytoMain, 1
 		je toMain
@@ -273,6 +294,10 @@ copyGrid PROC
 		toTemp:
 			mov al, [esi]
 			mov [edi], al
+
+			add esi, TYPE grid[0]
+			add edi, TYPE grid[0]
+
 			loop toTemp
 
 		jmp DONE
@@ -280,6 +305,10 @@ copyGrid PROC
 		toMain:
 			mov al, [edi]
 			mov [esi], al
+
+			add esi, TYPE grid[0]
+			add edi, TYPE grid[0]
+
 			loop toMain
 
 		DONE:
@@ -297,19 +326,26 @@ copyGrid ENDP
 drawGrid PROC
 	pushad
 
+	mov eax, 1000
+	call Delay
+	call Clrscr
+
+
 	; Number of rows to be printed
-	mov ecx, (MAX_ROWS-1)
+	mov ecx, (MAX_ROWS-2)
 	
 	; esi stores the index of the row of the character being printed, max = MAX_ROWS-1
-	mov esi, 0
+	mov esi, 1
 
 	OUTER:
 		
 		push ecx
-		mov ecx, (MAX_COLS-1)
+
+		; Number of columns to be considered excluding gutter
+		mov ecx, (MAX_COLS-2)
 
 		; edi stores the index of the column of the character being printed, max = MAX_COLS-1
-		mov edi, 0
+		mov edi, 1
 
 		call goToCenter
 
@@ -317,6 +353,8 @@ drawGrid PROC
 
 		INNER:
 			mov j, edi
+
+			mov readFromMain, 1
 
 			; i and j set, print character to screen
 			call read_ij
@@ -357,7 +395,176 @@ goToCenter PROC
 	ret
 goToCenter ENDP
 
-countNeighbors
 
+; ----------------------
+; Name: countNeighbors
+; Desc: Counts the neighbors of all cells and stores the results of whether each cell is alive or not in tempGrid. 
+;		logic --> tempGrid = next generation, followed by grid = temp grid
+; Input: None
+; Returns: updated grid
+; ----------------------
+countNeighbors PROC
+	pushad
+
+	; run until the user closes the window to end the game
+	start:
+		
+		; Number of rows to be considered excluding gutter
+		mov ecx, (MAX_ROWS-2)
+	
+		; esi stores the index of the row of the character being printed, max = MAX_ROWS-1
+		mov esi, 1
+
+		OUTER:
+		
+			push ecx
+
+			; Number of columns to be considered excluding gutter
+			mov ecx, (MAX_COLS-2)
+
+			; edi stores the index of the column of the character being printed, max = MAX_COLS-1
+			mov edi, 1
+
+			mov i, esi
+
+			INNER:
+				mov j, edi
+
+				; get num alive around the current cell as a 3x3 grid
+				call countNumAlive
+				
+				mov eax, numAlive
+				call WriteInt
+
+				cmp numAlive, 2
+				jbe DIE
+
+				cmp numAlive, 5
+				jae DIE
+
+				cmp numAlive, 3
+				je RESURRECT
+			
+
+				DIE:
+					mov val, '0'
+					mov setInMain, 0
+					call set_ij
+					jmp DONE
+
+				RESURRECT:
+					mov val, '1'
+					mov setInMain, 0
+					call set_ij
+
+				DONE:
+
+				inc edi
+				loop INNER
+
+				call Crlf
+
+			pop ecx
+			inc esi
+
+			loop OUTER
+
+			mov copyToMain, 1
+			call copyGrid
+			call drawGrid
+
+		jmp start
+	popad
+	ret
+countNeighbors ENDP
+
+
+; ----------------------
+; Name: countNumAlive
+; Desc: Counts the neighbors of all cells and stores the results of whether each cell is alive or not in tempGrid. 
+; Input: i: row of the cell around which the 3x3 grid is considered to count num alive
+;		 j: column of the cell around which the 3x3 grid is considered to count num alive
+; Returns: numAlive: num alive in the 3x3 cell surrounding grid[i][j]
+; ----------------------
+countNumAlive PROC
+	pushad
+
+	mov readFromMain, 1
+
+	mov numAlive, 0
+
+	push i
+	push j
+
+	dec i
+	dec j
+	call read_ij
+
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	inc j
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	inc j
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	;;;;;;;;;;
+
+	sub j, 2
+	inc i
+
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	inc j
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	inc j
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	;;;;;;;;;;;
+
+	sub j, 2
+	inc i
+
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	inc j
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	inc j
+	call read_ij
+	.IF al == '1'
+		inc numAlive
+	.ENDIF
+
+	pop j
+	pop i
+
+	popad
+	ret
+countNumAlive ENDP
 
 END main
