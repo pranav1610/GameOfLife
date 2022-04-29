@@ -5,8 +5,8 @@ INCLUDE Irvine32.inc
 .stack 4096
 ExitProcess PROTO, dwExitCode:DWORD
 
-MAX_COLS = 10
-MAX_ROWS = 10
+MAX_COLS = 16
+MAX_ROWS = 16
 
 .data
 
@@ -93,8 +93,18 @@ main PROC
 
 	call drawGrid
 
+	push eax
+	mov eax, yellow + (black*16)
+	call SetTextColor
+	pop eax
+
 	call countNeighbors
-	
+
+	push eax
+	mov eax, white + (black*16)
+	call SetTextColor
+	pop eax
+		
 
 	INVOKE ExitProcess, 0
 	
@@ -263,15 +273,15 @@ setTheseAlive PROC
 		mov setInMain, 1
 		mov val, '1'
 
-		mov i, 8
+		mov i, 4
 		mov j, 3
 		call set_ij
 
-		mov i, 8
+		mov i, 4
 		mov j, 4
 		call set_ij
 
-		mov i, 8
+		mov i, 4
 		mov j, 5
 		call set_ij
 		
@@ -334,7 +344,13 @@ drawGrid PROC
 
 	mov eax, 1000
 	call Delay
-	call Clrscr
+
+	push edx
+	mov edx, 0
+	call gotoxy
+	pop edx
+
+	;call Clrscr
 
 
 	; Number of rows to be printed
@@ -353,7 +369,7 @@ drawGrid PROC
 		; edi stores the index of the column of the character being printed, max = MAX_COLS-1
 		mov edi, 1
 
-		call goToCenter
+		;call goToCenter
 
 		mov i, esi
 
@@ -365,10 +381,31 @@ drawGrid PROC
 			; i and j set, print character to screen
 			call read_ij
 
-			; al has the character needed to be printed
+			cmp al, '1'
+			jne INVISIBLE
+
 			call WriteChar
 
+			; al has the character needed to be printed
+			;push eax
+			;mov eax, white + (white*16)
+			;call SetTextColor
+			;pop eax
 			call drawSpace
+			;call drawSpace
+
+			jmp DONE
+
+			INVISIBLE:
+			;push eax
+			;mov eax, black + (black*16)
+			;call SetTextColor
+			;pop eax
+			;call drawSpace
+			call WriteChar
+			call drawSpace
+
+			DONE:
 
 			inc edi
 			loop INNER
@@ -467,9 +504,6 @@ countNeighbors PROC
 
 				; get num alive around the current cell as a 3x3 grid
 				call countNumAlive
-				
-				mov eax, numAlive
-				call WriteInt
 
 				cmp numAlive, 2
 				jbe DIE
