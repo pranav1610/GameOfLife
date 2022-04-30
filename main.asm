@@ -5,8 +5,8 @@ INCLUDE Irvine32.inc
 .stack 4096
 ExitProcess PROTO, dwExitCode:DWORD
 
-MAX_COLS = 16
-MAX_ROWS = 16
+MAX_COLS = 30
+MAX_ROWS = 30
 
 .data
 
@@ -274,16 +274,41 @@ setTheseAlive PROC
 		mov val, '1'
 
 		mov i, 4
-		mov j, 3
-		call set_ij
-
-		mov i, 4
 		mov j, 4
 		call set_ij
 
-		mov i, 4
+		mov i, 5
 		mov j, 5
 		call set_ij
+
+		mov i, 6
+		mov j, 5
+		call set_ij
+
+		mov i, 6
+		mov j, 4
+		call set_ij
+
+		mov i, 6
+		mov j, 3
+		call set_ij
+
+
+		;mov i, 12
+		;mov j, 5
+		;call set_ij
+
+		;mov i, 12
+		;mov j, 5
+		;call set_ij
+
+		;mov i, 12
+		;mov j, 4
+		;call set_ij
+
+		;mov i, 12
+		;mov j, 3
+		;call set_ij
 		
 		mov val, '0'
 		mov setInMain, 0
@@ -342,7 +367,7 @@ copyGrid ENDP
 drawGrid PROC
 	pushad
 
-	mov eax, 1000
+	mov eax, 1
 	call Delay
 
 	push edx
@@ -384,25 +409,25 @@ drawGrid PROC
 			cmp al, '1'
 			jne INVISIBLE
 
-			call WriteChar
+			;call WriteChar
 
 			; al has the character needed to be printed
-			;push eax
-			;mov eax, white + (white*16)
-			;call SetTextColor
-			;pop eax
+			push eax
+			mov eax, white + (white*16)
+			call SetTextColor
+			pop eax
 			call drawSpace
-			;call drawSpace
+			call drawSpace
 
 			jmp DONE
 
 			INVISIBLE:
-			;push eax
-			;mov eax, black + (black*16)
-			;call SetTextColor
-			;pop eax
-			;call drawSpace
-			call WriteChar
+			push eax
+			mov eax, black + (black*16)
+			call SetTextColor
+			pop eax
+			call drawSpace
+			;call WriteChar
 			call drawSpace
 
 			DONE:
@@ -451,33 +476,44 @@ countNeighbors PROC
 
 	; run until the user closes the window to end the game
 	start:
+
+		mov setInMain, 1
+	
+		call top_gutter
+		call bottom_gutter
+		call left_gutter
+		call right_gutter
 		
 		; PERFORM WRAPPING
 		; row-wise wrapping
-		mov rowWise, 1
+		;mov rowWise, 1
 
 		; row MAX_ROWS-2 to top gutter(row 0)
-		mov tempI, MAX_ROWS-2
-		mov tempJ, 0
-		call wrap_elements
+		;mov tempI, MAX_ROWS-2
+		;mov tempJ, 0
+		;call wrap_elements
+			
+
 
 		; row MAX_ROWS-1 to row 1
-		mov tempI, MAX_ROWS-1
-		mov tempJ, 1
-		call wrap_elements
+		;mov tempI, 1
+		;mov tempJ, MAX_ROWS-1
+		;call wrap_elements
 
 		; column-wise wrapping
 		mov rowWise, 0
 		
 		; col MAX_COLS-2 to left gutter(column 0)
-		mov tempI, MAX_COLS-2
-		mov tempJ, 0
-		call wrap_elements
+		;mov tempI, MAX_COLS-2
+		;mov tempJ, 0
+		;call wrap_elements
 
-		; row MAX_COLS-1 to row 1
-		mov tempI, MAX_COLS-1
-		mov tempJ, 1
-		call wrap_elements
+		; col 1 to MAX_COLS-1
+		;mov tempI, 1
+		;mov tempJ, MAX_COLS-1
+		;call wrap_elements
+
+		call copy_corners
 
 
 		; PERFORM SIMULATION
@@ -505,20 +541,29 @@ countNeighbors PROC
 				; get num alive around the current cell as a 3x3 grid
 				call countNumAlive
 
-				cmp numAlive, 2
+				cmp numAlive, 1
 				jbe DIE
 
-				cmp numAlive, 5
+				cmp numAlive, 4
 				jae DIE
 
 				cmp numAlive, 3
 				je RESURRECT
-			
 
+				cmp numAlive, 2
+				je CHECK_SELF_ALIVE
+				
 				DIE:
 					mov val, '0'
 					mov setInMain, 0
 					call set_ij
+					jmp DONE
+
+				CHECK_SELF_ALIVE:
+					call read_ij
+					cmp al, '1'
+					je RESURRECT
+
 					jmp DONE
 
 				RESURRECT:
@@ -531,7 +576,7 @@ countNeighbors PROC
 				inc edi
 				loop INNER
 
-				call Crlf
+				;call Crlf
 
 			pop ecx
 			inc esi
@@ -540,12 +585,143 @@ countNeighbors PROC
 
 			mov copyToMain, 1
 			call copyGrid
+
 			call drawGrid
 
 		jmp start
 	popad
 	ret
 countNeighbors ENDP
+
+top_gutter PROC
+	pushad
+	
+	push i
+	push j
+	
+	mov esi, 1
+	mov ecx, MAX_COLS-2
+
+	L1:
+
+		mov j, esi	
+		
+		mov i, MAX_ROWS-2
+		call read_ij
+
+		mov val, al
+
+		mov i, 0
+		;mov setInMain, 1
+		call set_ij
+
+		inc esi
+		loop L1
+
+	pop j
+	pop i
+
+	popad
+	ret
+top_gutter ENDP
+
+bottom_gutter PROC
+	pushad
+	
+	push i
+	push j
+	
+	mov esi, 1
+	mov ecx, MAX_COLS-2
+
+	L1:
+
+		mov j, esi	
+		
+		mov i, 1
+		call read_ij
+
+		mov val, al
+
+		mov i, MAX_ROWS-1
+		;mov setInMain, 1
+		call set_ij
+
+		inc esi
+		loop L1
+
+	pop j
+	pop i
+
+	popad
+	ret
+bottom_gutter ENDP
+
+left_gutter PROC
+	pushad
+	
+	push i
+	push j
+	
+	mov esi, 1
+	mov ecx, MAX_ROWS-3
+
+	L1:
+
+		mov i, esi	
+		
+		mov j, MAX_COLS-2
+		call read_ij
+
+		mov val, al
+
+		mov j, 0
+		;mov setInMain, 1
+		call set_ij
+
+		inc esi
+		loop L1
+
+	pop j
+	pop i
+
+	popad
+	ret
+left_gutter ENDP
+
+right_gutter PROC
+	pushad
+	
+	push i
+	push j
+	
+	mov esi, 1
+	mov ecx, MAX_ROWS-3
+
+	L1:
+
+		mov i, esi	
+		
+		mov j, 1
+		call read_ij
+
+		mov val, al
+
+		mov j, MAX_COLS-1
+		;mov setInMain, 1
+		call set_ij
+
+		inc esi
+		loop L1
+
+	pop j
+	pop i
+
+	popad
+	ret
+right_gutter ENDP
+
+
 
 ; ----------------------
 ; Name: wrap_elements
@@ -560,16 +736,16 @@ wrap_elements PROC
 	push i
 	push j
 
-	mov ecx, MAX_ROWS
 
 	; indexed addressing for changing row/col based on rowWise flag
-	mov esi, 0
+	mov esi, 1
 	
 	cmp rowWise, 1
 	je ROW
 	
 	; COLUMN-WISE
 	
+	mov ecx, MAX_COLS
 		L2:
 			mov i, esi
 			mov ebx, tempI
@@ -592,7 +768,7 @@ wrap_elements PROC
 	; ROW-WISE
 	ROW:
 		
-		
+		mov ecx, MAX_ROWS	
 		L1:
 			mov j, esi
 			mov ebx, tempI
@@ -617,6 +793,78 @@ wrap_elements PROC
 	popad
 	ret 8
 wrap_elements ENDP	
+
+copy_corners PROC
+	pushad
+
+	push i
+	push j
+
+	push setInMain
+
+	mov setInMain, 1
+
+	;;;;;;;;;;;
+
+	; good bottom-right to gutter top-left
+	mov i, MAX_ROWS-2
+	mov j, MAX_COLS-2
+	call read_ij
+
+	mov val, al
+
+	mov i, 0
+	mov j, 0
+	
+	call set_ij
+
+	;;;;;;;;;;;;;
+	
+	; good bottom-left to gutter top-right
+	mov i, MAX_ROWS-2
+	mov j, 0
+	call read_ij
+
+	mov val, al
+
+	mov i, 0
+	mov j, MAX_COLS-1
+	call set_ij
+
+	;;;;;;;;;;;;
+
+	; good top-right to gutter bottom-left
+	mov i, 1
+	mov j, MAX_COLS-2
+	call read_ij
+
+	mov val, al
+
+	mov i, MAX_ROWS-1
+	mov j, 0
+	call set_ij
+
+	; good top-left to gutter bottom-right
+	mov i, 1
+	mov j, 1
+	call read_ij
+
+	mov val, al
+
+	mov i, MAX_ROWS-1
+	mov j, MAX_COLS-1
+	call set_ij
+
+	;;;;;;;;;;;;;
+
+	pop setInMain
+
+	pop j
+	pop i
+
+	popad
+	ret
+copy_corners ENDP
 
 
 ; ----------------------
@@ -666,13 +914,13 @@ countNumAlive PROC
 		inc numAlive
 	.ENDIF
 
-	inc j
-	call read_ij
-	.IF al == '1'
-		inc numAlive
-	.ENDIF
+	;inc j
+	;call read_ij
+	;.IF al == '1'
+	;	inc numAlive
+	;.ENDIF
 
-	inc j
+	add j, 2
 	call read_ij
 	.IF al == '1'
 		inc numAlive
