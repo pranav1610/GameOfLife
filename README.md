@@ -18,7 +18,7 @@ Game of Life is a cellular automaton devised by the British mathematician John H
 ## Status:
 Complete
 
-[Back to top](#)
-
 ## References
 https://playgameoflife.com/
+
+[Back to top](#)
