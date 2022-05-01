@@ -19,15 +19,8 @@ MAX_ROWS = 30
 	; copy of the grid that stores the game of life 
 	tempGrid BYTE MAX_ROWS*MAX_COLS DUP ('0')
 
-	; character representing the organism
-	organism BYTE 'O'
-
 	; A space to match the spacing of characters drawn vertically/horizontally and represents dead organism
 	space BYTE ' '
-
-	; Location where broad starts
-	gridX BYTE ?
-	gridY BYTE ? 
 
 	; i --> row of the character to be read
 	i DWORD ?
@@ -35,20 +28,8 @@ MAX_ROWS = 30
 	; j --> column of the character to be read
 	j DWORD ?
 
-	; temporary row of the character to be read
-	tempI DWORD ?
-	
-	; temporary column of the character to be read
-	tempJ DWORD ?
-
 	; val --> value to be set at a location i,j in grid[i][j]
 	val BYTE ?
-
-	; Temporarily stores the index of a character
-	tempIndex DWORD ?
-
-	; Stores the character in above index
-	tempChar BYTE ?
 
 	; flag indicates if main grid is to be drawn(=1) or tempGrid(=0)
 	drawMain DWORD 1
@@ -56,11 +37,6 @@ MAX_ROWS = 30
 	; flag indicates if the temp grid is to be copied to main grid or other way. 1 means main = temp(copy temp to main), and 0 means temp = main
 	copyToMain DWORD 0
 
-	; flag indicates if the grid[i][j] is to be read from grid or tempGrid. 1 means read from grid, 0 means read from tempGrid
-	readFromMain DWORD 1
-
-	; flag indicates if the grid[i][j] is to be set to val in grid or tempGrid. 1 means grid[i][j]=val and 0 means tempGrid[i][j]=val
-	setInMain DWORD 1
 
 	; Phase 3 flag
 	; Determines if the wrapping is to be done row-wise(1) or column-wise(0)
@@ -69,25 +45,10 @@ MAX_ROWS = 30
 	; stores the number of alive in the mini 3x3 grid
 	numAlive DWORD 0
 
-
-
-	testStr BYTE "here", 0
-
-	
-
 .code
 main PROC
 
-	; get the optimal start position of grid drawing
-	call GetMaxXY
-
-	mov gridX,al
-
-	; mov up to a length that equals half the grid to center the grid
-	sub dl, MAX_ROWS*2
-	mov gridY, dl
-
-	;call initGrid
+	
 
 	call setTheseAlive
 
@@ -113,21 +74,6 @@ main ENDP
 ; FUNCTIONS
 
 ; ----------------------
-; Name: drawOrganism
-; Desc: Draws the organism character(or 'O') on the screen
-; Input: None
-; Returns: None. Simply outputs to screen
-; ----------------------
-drawOrganism PROC
-	pusha
-	mov al, organism
-	call WriteChar
-
-	popa
-	ret
-drawOrganism ENDP
-
-; ----------------------
 ; Name: drawSpace
 ; Desc: Draws the dead organism character(or ' ') on the screen
 ; Input: None
@@ -151,12 +97,14 @@ drawSpace ENDP
 ;		 readFromMain --> ; flag indicates if the grid[i][j] is to be read from grid or tempGrid. 1 means read from grid, 0 means read from tempGrid
 ; Returns: In al, the character stored in array[i][j]
 ; ----------------------
-read_ij PROC uses edx
-	mov edx, i
+read_ij PROC uses edx,
+	varReadFromMain: DWORD, varI: DWORD, varJ: DWORD
+
+	mov edx, varI
 	imul edx, MAX_COLS
-	add edx, j
+	add edx, varJ
 	
-	cmp readFromMain, 1
+	cmp varReadFromMain, 1
 	je fromMain
 
 	mov al, tempGrid[edx]
@@ -183,15 +131,17 @@ read_ij ENDP
 ;		 setInMain --> ; flag indicates if the grid[i][j] is to be set to val in grid or tempGrid. 1 means grid[i][j]=val and 0 means tempGrid[i][j]=val
 ; Returns: None. Mutates the character stored in array[i][j] to val
 ; ----------------------
-set_ij PROC
+set_ij PROC,
+	varSetInMain: DWORD, varI: DWORD, varJ: DWORD, varVal: BYTE
+
 	pushad
 
-	mov edx, i
+	mov edx, varI
 	imul edx, MAX_COLS
-	add edx, j
-	mov al, val
+	add edx, varJ
+	mov al, varVal
 
-	cmp setInMain, 1
+	cmp varSetInMain, 1
 	je inMain
 
 	mov tempGrid[edx], al
@@ -207,62 +157,6 @@ set_ij PROC
 set_ij ENDP
 
 ; ----------------------
-; Name: initGrid
-; Desc: Initalize the grid as follows:
-;			1. Set the border as a 'gutter' or character 0
-;			2. Set all remaining cells between 1 & MAX_ROWS-2 and 1 and MAX_COLS-2 to 0 indicating they are dead
-;			3. Set alive only desired characters to play. Alive is defined by setting that cell = 1
-; Input: None
-; Returns: None. Mutates the character stored in grid
-; ----------------------
-initGrid PROC
-	pushad
-		
-	; Number of rows to be set
-	mov ecx, (MAX_ROWS-1)
-	
-	; esi stores the index of the row of the character being printed, max = MAX_ROWS-1
-	mov esi, 0
-
-	; Value to be set to entire grid to begin with
-	mov val, '0'
-
-	OUTER:
-		
-		push ecx
-		mov ecx, (MAX_COLS-1)
-
-		; edi stores the index of the column of the character being printed, max = MAX_COLS-1
-		mov edi, 0
-
-		mov i, esi
-
-		INNER:
-			mov j, edi
-			mov setInMain, 1
-
-			; parameters i, j, setInMain, and val are set, call grid[i][j] = val now.
-			call set_ij
-
-			mov setInMain, 0
-			call set_ij
-
-			inc edi
-			loop INNER
-
-		pop ecx
-		inc esi
-
-		loop OUTER
-
-	; reset flag
-	mov setInMain, 0
-
-	popad
-	ret
-initGRID ENDP
-
-; ----------------------
 ; Name: setTheseAlive
 ; Desc: sets desired cells in main grid alive to start the simulation of game of life
 ; Input: None.
@@ -270,48 +164,13 @@ initGRID ENDP
 ; ----------------------
 setTheseAlive PROC
 	pushad
-		mov setInMain, 1
-		mov val, '1'
+	
+		INVOKE set_ij, 1, 4, 4, '1'
+		INVOKE set_ij, 1, 5, 5, '1'
+		INVOKE set_ij, 1, 6, 5, '1'
+		INVOKE set_ij, 1, 6, 4, '1'
+		INVOKE set_ij, 1, 6, 3, '1'
 
-		mov i, 4
-		mov j, 4
-		call set_ij
-
-		mov i, 5
-		mov j, 5
-		call set_ij
-
-		mov i, 6
-		mov j, 5
-		call set_ij
-
-		mov i, 6
-		mov j, 4
-		call set_ij
-
-		mov i, 6
-		mov j, 3
-		call set_ij
-
-
-		;mov i, 12
-		;mov j, 5
-		;call set_ij
-
-		;mov i, 12
-		;mov j, 5
-		;call set_ij
-
-		;mov i, 12
-		;mov j, 4
-		;call set_ij
-
-		;mov i, 12
-		;mov j, 3
-		;call set_ij
-		
-		mov val, '0'
-		mov setInMain, 0
 	popad
 	ret
 setTheseAlive ENDP
@@ -396,20 +255,14 @@ drawGrid PROC
 
 		;call goToCenter
 
-		mov i, esi
+		;mov i, esi
 
 		INNER:
-			mov j, edi
 
-			mov readFromMain, 1
-
-			; i and j set, print character to screen
-			call read_ij
+			INVOKE read_ij, 1, esi, edi
 
 			cmp al, '1'
 			jne INVISIBLE
-
-			;call WriteChar
 
 			; al has the character needed to be printed
 			push eax
@@ -447,22 +300,6 @@ drawGrid PROC
 	ret
 drawGrid ENDP
 
-goToCenter PROC
-	pusha
-
-	mov dl, gridX
-	mov dh, gridY
-
-	call Gotoxy
-
-	; next row to be printed below current location, so (x,y + 1) if curr = (x,y)
-	inc dh
-	mov gridY, dh
-
-	popa
-	ret
-goToCenter ENDP
-
 
 ; ----------------------
 ; Name: countNeighbors
@@ -477,42 +314,11 @@ countNeighbors PROC
 	; run until the user closes the window to end the game
 	start:
 
-		mov setInMain, 1
-	
 		call top_gutter
 		call bottom_gutter
 		call left_gutter
 		call right_gutter
 		
-		; PERFORM WRAPPING
-		; row-wise wrapping
-		;mov rowWise, 1
-
-		; row MAX_ROWS-2 to top gutter(row 0)
-		;mov tempI, MAX_ROWS-2
-		;mov tempJ, 0
-		;call wrap_elements
-			
-
-
-		; row MAX_ROWS-1 to row 1
-		;mov tempI, 1
-		;mov tempJ, MAX_ROWS-1
-		;call wrap_elements
-
-		; column-wise wrapping
-		mov rowWise, 0
-		
-		; col MAX_COLS-2 to left gutter(column 0)
-		;mov tempI, MAX_COLS-2
-		;mov tempJ, 0
-		;call wrap_elements
-
-		; col 1 to MAX_COLS-1
-		;mov tempI, 1
-		;mov tempJ, MAX_COLS-1
-		;call wrap_elements
-
 		call copy_corners
 
 
@@ -554,22 +360,18 @@ countNeighbors PROC
 				je CHECK_SELF_ALIVE
 				
 				DIE:
-					mov val, '0'
-					mov setInMain, 0
-					call set_ij
+					INVOKE set_ij, 0, i, j, '0'
 					jmp DONE
 
 				CHECK_SELF_ALIVE:
-					call read_ij
+					INVOKE read_ij, 1, i, j
 					cmp al, '1'
 					je RESURRECT
 
 					jmp DONE
 
 				RESURRECT:
-					mov val, '1'
-					mov setInMain, 0
-					call set_ij
+					INVOKE set_ij, 0, i, j, '1'
 
 				DONE:
 
@@ -581,7 +383,8 @@ countNeighbors PROC
 			pop ecx
 			inc esi
 
-			loop OUTER
+			dec ecx
+			jnz OUTER
 
 			mov copyToMain, 1
 			call copyGrid
@@ -596,30 +399,17 @@ countNeighbors ENDP
 top_gutter PROC
 	pushad
 	
-	push i
-	push j
-	
 	mov esi, 1
 	mov ecx, MAX_COLS-2
 
 	L1:
 
-		mov j, esi	
-		
-		mov i, MAX_ROWS-2
-		call read_ij
+		INVOKE read_ij, 1, MAX_ROWS-2, esi
 
-		mov val, al
-
-		mov i, 0
-		;mov setInMain, 1
-		call set_ij
+		INVOKE set_ij, 1, 0, esi, al
 
 		inc esi
 		loop L1
-
-	pop j
-	pop i
 
 	popad
 	ret
@@ -627,31 +417,17 @@ top_gutter ENDP
 
 bottom_gutter PROC
 	pushad
-	
-	push i
-	push j
-	
+
 	mov esi, 1
 	mov ecx, MAX_COLS-2
 
 	L1:
+		INVOKE read_ij, 1, 1, esi
 
-		mov j, esi	
-		
-		mov i, 1
-		call read_ij
-
-		mov val, al
-
-		mov i, MAX_ROWS-1
-		;mov setInMain, 1
-		call set_ij
+		INVOKE set_ij, 1, MAX_ROWS-1, esi, al
 
 		inc esi
 		loop L1
-
-	pop j
-	pop i
 
 	popad
 	ret
@@ -659,31 +435,17 @@ bottom_gutter ENDP
 
 left_gutter PROC
 	pushad
-	
-	push i
-	push j
-	
+
 	mov esi, 1
 	mov ecx, MAX_ROWS-3
 
 	L1:
 
-		mov i, esi	
-		
-		mov j, MAX_COLS-2
-		call read_ij
-
-		mov val, al
-
-		mov j, 0
-		;mov setInMain, 1
-		call set_ij
+		INVOKE read_ij, 1, esi, MAX_COLS-2
+		INVOKE set_ij, 1, esi, 0, al
 
 		inc esi
 		loop L1
-
-	pop j
-	pop i
 
 	popad
 	ret
@@ -691,176 +453,48 @@ left_gutter ENDP
 
 right_gutter PROC
 	pushad
-	
-	push i
-	push j
-	
+
 	mov esi, 1
 	mov ecx, MAX_ROWS-3
 
 	L1:
 
-		mov i, esi	
-		
-		mov j, 1
-		call read_ij
-
-		mov val, al
-
-		mov j, MAX_COLS-1
-		;mov setInMain, 1
-		call set_ij
+		INVOKE read_ij, 1, esi, 1
+		INVOKE set_ij, 1, esi, MAX_COLS-1, al
 
 		inc esi
 		loop L1
-
-	pop j
-	pop i
 
 	popad
 	ret
 right_gutter ENDP
 
-
-
-; ----------------------
-; Name: wrap_elements
-; Desc: Copies elements from row/col tempI to row/col tempJ respectively
-; Input: tempI: row/col that needs to be copied to row/col tempJ
-;		 tempJ: row/col where row/col tempI is copied
-; Returns: Updated grid such that the gutter copies what's in good row/col
-; ----------------------
-wrap_elements PROC
-	pushad
-	
-	push i
-	push j
-
-
-	; indexed addressing for changing row/col based on rowWise flag
-	mov esi, 1
-	
-	cmp rowWise, 1
-	je ROW
-	
-	; COLUMN-WISE
-	
-	mov ecx, MAX_COLS
-		L2:
-			mov i, esi
-			mov ebx, tempI
-			mov j, ebx
-			call read_ij
-
-			mov val, al
-
-			mov ebx, tempJ
-			mov j, ebx
-			mov setInMain, 1
-			call set_ij
-
-			inc esi
-			loop L2
-
-	jmp DONE
-
-
-	; ROW-WISE
-	ROW:
-		
-		mov ecx, MAX_ROWS	
-		L1:
-			mov j, esi
-			mov ebx, tempI
-			mov i, ebx
-			call read_ij
-
-			mov val, al
-
-			mov ebx, tempJ
-			mov i, ebx
-			mov setInMain, 1
-			call set_ij
-
-			inc esi
-			loop L1
-
-	DONE:
-
-	pop j
-	pop i
-
-	popad
-	ret 8
-wrap_elements ENDP	
-
 copy_corners PROC
 	pushad
-
-	push i
-	push j
-
-	push setInMain
-
-	mov setInMain, 1
 
 	;;;;;;;;;;;
 
 	; good bottom-right to gutter top-left
-	mov i, MAX_ROWS-2
-	mov j, MAX_COLS-2
-	call read_ij
-
-	mov val, al
-
-	mov i, 0
-	mov j, 0
-	
-	call set_ij
+	INVOKE read_ij, 1, MAX_ROWS-2, MAX_COLS-2
+	INVOKE set_ij, 1, 0, 0, al
 
 	;;;;;;;;;;;;;
 	
 	; good bottom-left to gutter top-right
-	mov i, MAX_ROWS-2
-	mov j, 0
-	call read_ij
-
-	mov val, al
-
-	mov i, 0
-	mov j, MAX_COLS-1
-	call set_ij
+	INVOKE read_ij, 1, MAX_ROWS-2, 0
+	INVOKE set_ij, 1, 0, MAX_COLS-1, al
 
 	;;;;;;;;;;;;
 
 	; good top-right to gutter bottom-left
-	mov i, 1
-	mov j, MAX_COLS-2
-	call read_ij
-
-	mov val, al
-
-	mov i, MAX_ROWS-1
-	mov j, 0
-	call set_ij
+	INVOKE read_ij, 1, 1, MAX_COLS-2
+	INVOKE set_ij, 1, MAX_ROWS-1, 0, al
 
 	; good top-left to gutter bottom-right
-	mov i, 1
-	mov j, 1
-	call read_ij
-
-	mov val, al
-
-	mov i, MAX_ROWS-1
-	mov j, MAX_COLS-1
-	call set_ij
+	INVOKE read_ij, 1, 1, 1
+	INVOKE set_ij, 1, MAX_ROWS-1, MAX_COLS-1, al
 
 	;;;;;;;;;;;;;
-
-	pop setInMain
-
-	pop j
-	pop i
 
 	popad
 	ret
@@ -877,7 +511,7 @@ copy_corners ENDP
 countNumAlive PROC
 	pushad
 
-	mov readFromMain, 1
+	;mov readFromMain, 1
 
 	mov numAlive, 0
 
@@ -886,20 +520,23 @@ countNumAlive PROC
 
 	dec i
 	dec j
-	call read_ij
+
+	INVOKE read_ij, 1, i, j
 
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
 
 	inc j
-	call read_ij
+	INVOKE read_ij, 1, i, j
+
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
 
 	inc j
-	call read_ij
+	INVOKE read_ij, 1, i, j
+
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
@@ -908,20 +545,15 @@ countNumAlive PROC
 
 	sub j, 2
 	inc i
+	INVOKE read_ij, 1, i, j
 
-	call read_ij
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
 
-	;inc j
-	;call read_ij
-	;.IF al == '1'
-	;	inc numAlive
-	;.ENDIF
-
 	add j, 2
-	call read_ij
+	INVOKE read_ij, 1, i, j
+
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
@@ -930,20 +562,22 @@ countNumAlive PROC
 
 	sub j, 2
 	inc i
+	INVOKE read_ij, 1, i, j
 
-	call read_ij
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
 
 	inc j
-	call read_ij
+	INVOKE read_ij, 1, i, j
+
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
 
 	inc j
-	call read_ij
+	INVOKE read_ij, 1, i, j
+
 	.IF al == '1'
 		inc numAlive
 	.ENDIF
