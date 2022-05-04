@@ -48,16 +48,11 @@ MAX_ROWS = 30
 .code
 main PROC
 
-	
+	call getUserInput 
 
-	call setTheseAlive
+	;call setTheseAlive
 
 	call drawGrid
-
-	push eax
-	mov eax, yellow + (black*16)
-	call SetTextColor
-	pop eax
 
 	call countNeighbors
 
@@ -175,6 +170,52 @@ setTheseAlive PROC
 	ret
 setTheseAlive ENDP
 
+getUserInput PROC
+	pushad
+		
+		; exclude gutters
+		mov dl, 1
+		mov dh, 1
+		call Gotoxy
+
+		; exclude gutters
+
+		; ecx represents row(i), edx represents col(j)
+		mov ecx, 1
+		mov edx, 1
+
+		start:
+			call drawGrid			
+			call ReadChar
+			
+			.IF al == 'w'
+				dec ecx			
+
+			.ELSEIF al == 'a'
+				dec edx
+			.ELSEIF al == 's'
+				inc ecx
+			.ELSEIF al == 'd'
+				inc edx
+			.ELSEIF al == ' '
+				INVOKE read_ij, 1, ecx, edx
+				.IF al == '1'
+					INVOKE set_ij, 1, ecx, edx, '0'
+				.ELSEIF al == '0'
+					INVOKE set_ij, 1, ecx, edx, '1'
+				.ENDIF
+
+			.ELSEIF al == 'q'
+				jmp DONE
+
+			.ENDIF
+			jmp start
+
+		DONE:
+
+	popad
+	ret
+getUserInput ENDP
 
 ; ----------------------
 ; Name: copyGrid
